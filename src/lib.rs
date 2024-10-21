@@ -2,6 +2,7 @@ use core::panic;
 use rand::Rng;
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use url::{ParseError, Url as UrlType};
@@ -78,7 +79,7 @@ trait LinkStore {
 }
 
 // Implement the InMemoryLinkStore
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct InMemoryLinkStore {
     links: Arc<Mutex<HashMap<u64, Link>>>,
 }
@@ -102,8 +103,8 @@ impl LinkStore for InMemoryLinkStore {
     }
 
     fn update(&mut self, id: u64, link: Link) -> Result<(), String> {
-        if let std::collections::hash_map::Entry::Occupied(mut e) = self.links.lock().unwrap().entry(id) {
-            e.insert(link);
+        if self.links.lock().unwrap().contains_key(&id) {
+            self.links.lock().unwrap().insert(id, link);
             Ok(())
         } else {
             Err("Link not found".to_string())
@@ -126,8 +127,8 @@ impl Default for Link {
         let id = rand::thread_rng().gen();
         Link {
             id,
-            origin: UrlType::parse("").unwrap(),
-            target: UrlType::parse("").unwrap(),
+            origin: UrlType::parse("https://example.com").unwrap(),
+            target: UrlType::parse("https://example.com").unwrap(),
             created_at: DefaultInstant::default(),
             updated_at: DefaultInstant::default(),
         }
@@ -180,7 +181,7 @@ mod tests {
         let result: bool = match myurl.shorten() {
             Ok(val) => val,
             Err(e) => {
-                println!("Error: {}", e);
+                println!("Error: {:#?}", e);
                 false
             }
         };
@@ -214,8 +215,14 @@ mod tests {
         );
 
         let link = Link::default();
-        let id = linkstore.create(link).unwrap();
-        assert!(id, "id is not {}, {#:?}", id, linkstore);
+        let id = match linkstore.create(link) {
+            Ok(val) => val,
+            Err(e) => {
+                println!("Error: {:#?}", e);
+                ()
+            }
+        };
+        assert!(id != (), "id is not {:#?}, {:#?}", id, linkstore);
     }
 
     #[test]
